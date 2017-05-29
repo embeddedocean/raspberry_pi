@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
@@ -103,27 +104,28 @@ void parse_adc_buffer_header(uint8_t *buf)
 void print_adc_buffer_header(uint8_t *buf)
 {
     int n;
-    for(n = 0; n < 36; n++) fprintf(stdout,"%d ", buf[n]);
-    fprintf(stdout,"\n");
+
+    //for(n = 0; n < 36; n++) fprintf(stdout,"%d ", buf[n]);
+    //fprintf(stdout,"\n");
+
     //printf("nblocks per spi buffer %d\n", nblocks_per_spi_buffer);
     fprintf(stdout,"nblocks per adc buffer %d\n", nblocks_per_adc_buffer);
     fprintf(stdout,"nbits %d\n", bytes_per_samp);
     fprintf(stdout,"nsamps %d\n", nsamps);
     fprintf(stdout,"fs %d\n", fs);
     fprintf(stdout, "time: %d/%d/%d %d:%d:%f\n",
-    day, month, year, hour, minute, (float)sec + 0.000001*(float)usec);
+      day, month, year, hour, minute, (float)sec + 0.000001*(float)usec);
 
+    //uint8_t sum = 0;
+    //for(n = 0; n < nsamps-2; n++) sum -= (uint8_t)n;
+    //fprintf(stdout,"checksum for 0:%d is %d\n", nsamps-1, sum);
 
-    uint8_t sum = 0;
-    for(n = 0; n < nsamps-2; n++) sum -= (uint8_t)n;
-    fprintf(stdout,"checksum for 0:%d is %d\n", nsamps-1, sum);
-
-    for(n = 0; n < 36; n++)
-    fprintf(stdout,"%d ", buf[n]);
-    fprintf(stdout,"\n");
-    for(n = SPI_BUFFER_NBYTES-36; n < SPI_BUFFER_NBYTES; n++)
-    fprintf(stdout,"%d ", buf[n]);
-    fprintf(stdout,"\n");
+    //for(n = 0; n < 36; n++)
+    //fprintf(stdout,"%d ", buf[n]);
+    //fprintf(stdout,"\n");
+    //for(n = SPI_BUFFER_NBYTES-36; n < SPI_BUFFER_NBYTES; n++)
+    //fprintf(stdout,"%d ", buf[n]);
+    //fprintf(stdout,"\n");
 
 }
 
@@ -132,29 +134,35 @@ int main(int argc, char **argv)
     int c;
     int n;
     char device[32] = "/dev/spidev0.0";
-    uint32_t baud = 12000000;
+    uint32_t baud = 24000000;
+
+    char* mnt_src  = "/dev/sda1";
+    char* mnt_trgt = "/mnt";
+    char* mnt_type = "vfat";
+    unsigned long mnt_flags = 0;
+    char* mnt_opts = NULL;
+
 
     while ((c = getopt(argc, argv, "b:n:hv?")) != EOF) {
         switch (c) {
-            case 'b':
-            baud = (uint32_t)atoi(optarg);
-            continue;
-            case 'v':
-            verbose = 1;
-            continue;
-            case 'h':
-            continue;
+        case 'b':
+           baud = (uint32_t)atoi(optarg);
+           continue;
+        case 'v':
+           verbose = 1;
+           continue;
+        case 'h':
+           continue;
         }
     }
 
-    fprintf(stdout,"Mounting /mnt ... ");
-    int ret = mount("/dev/sda1", "/mnt", "vfat", 0, NULL);
-    //int ret = mount("/dev/sda1", "/mnt", "msdos", 0, NULL);
-    if(ret == 0) {
-        fprintf(stdout," successful %d\n", ret);
-        } else {
-        fprintf(stdout," FAILED %d\n", ret);
-        //return(0);
+
+    // Mount the SSD
+    int result = mount(mnt_src, mnt_trgt, mnt_type, mnt_flags, mnt_opts);
+    if (result == 0) {
+      printf("Filesystem mounted %s\n", mnt_trgt);
+    } else {
+      printf("Failed to mount %s: %s [%d]\n", mnt_src, strerror(errno), errno);
     }
 
     // open spi device
@@ -164,8 +172,7 @@ int main(int argc, char **argv)
     }
     get_spi_config(spi_fd);
 
-    // clear spi buffer
-    int stat = spi_receive(spi_fd, spi_buffer, SPI_BUFFER_NBYTES);
+    result = spi_receive(spi_fd, spi_buffer, SPI_BUFFER_NBYTES);
 
     // master on pin
     unsigned int on_gpio = 22;
@@ -190,9 +197,9 @@ int main(int argc, char **argv)
     int go = 1;
     while( go ) {
 
-        stat = spi_master_receive(spi_fd, spi_buffer, SPI_BUFFER_NBYTES);
-        if( stat < 0 ) {
-            fprintf(stdout,"spi_receive error: %d\n", stat);
+        result = spi_master_receive(spi_fd, spi_buffer, SPI_BUFFER_NBYTES);
+        if( result < 0 ) {
+            fprintf(stdout,"spi_receive error: %d\n", result);
         }
 
         nblocks_received += SPI_DATA_NBLOCKS;

@@ -20,11 +20,6 @@ OFILES = gpio.o spi.o
 spi_logger:  spi_logger.c $(OFILES)
 	$(CC) -o spi_logger spi_logger.c $(OFILES)
 
-spi_test:  spi_test5.c $(OFILES)
-	$(CC) -o spi_test spi_test5.c $(OFILES)
-
-spi_clear:  spi_clear.c $(OFILES)
-	$(CC) -o spi_clear spi_clear.c $(OFILES)
 
 clean: 
 	rm $(OFILES)
